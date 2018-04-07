@@ -1,8 +1,9 @@
 var socket;
 socket = io.connect();
-var game = new Phaser.Game(800, 500, Phaser.AUTO, document.getElementById('game'));
+var game = new Phaser.Game(500, 500, Phaser.AUTO, document.getElementById('game'));
 
 var enemies = [];
+var idCheck = [];
 var playerBulletArr = [];
 var monsterList = [];
 var monsterBulletArr = [];
@@ -18,7 +19,7 @@ var main = function () {};
 /***** functions start *****/
 function onSocketConnected() {
     createPlayer();
-    
+
     isConnected = true;
     socket.emit('new-player', {
         x: playerShip.x,
@@ -49,8 +50,10 @@ function onRemovePlayer(data) {
 var newPlayer = function (id, startX, startY) {
     this.x = startX;
     this.y = startY;
+    this.playerShip;
 
     this.playerShip = game.add.sprite(this.x, this.y, 'player');
+
     this.playerShip.id = id;
     this.playerShip.scale.setTo(0.4, 0.4); // set playerShip size
     game.physics.arcade.enable(this.playerShip); // enable playerShip properties like velocity etc.
@@ -58,6 +61,7 @@ var newPlayer = function (id, startX, startY) {
 }
 
 function onNewPlayer(data) {
+
     var newEnemy = new newPlayer(data.id, data.x, data.y);
     enemies.push(newEnemy);
 }
@@ -90,6 +94,7 @@ function onPlayerBulletUpdate(serverBulletArr) {
 }
 
 function onPlayerHit(id) {
+    //socket.emit('debug', {data: enemies});
     if (id == socket.id) {
         if (boom.getFirstExists(false)) {
             var explosion = boom.getFirstExists(false);
@@ -97,19 +102,26 @@ function onPlayerHit(id) {
             explosion.play('boom', 30, false, true);
         }
         playerShip.kill();
+        //socket.emit('debug', {data: enemies});
     } else {
+        //socket.emit('debug', {data: enemies});
         var player = findPlayerById(id);
         if (boom.getFirstExists(false)) {
             var explosion2 = boom.getFirstExists(false);
             explosion2.reset(player.playerShip.body.x - 70, player.playerShip.body.y - 70);
             explosion2.play('boom', 30, false, true);
         }
+
+
         player.playerShip.kill();
         for (var i = 0; i < enemies.length; i++) {
-            if (player == enemies[i]) {
+            if (enemies[i].playerShip.id == id) {
                 enemies.splice(i, 1);
+                break;
             }
+            //socket.emit('debug', {data: enemies});
         }
+
     }
 }
 
@@ -164,6 +176,20 @@ function findPlayerById(id) {
         }
     }
 }
+
+//var currentEnemy = function(id, startX, startY) {
+//    this.x = startY;
+//        this.y = startY;
+//        this.playerShip;
+//        this.playerShip.id = id;
+//        this.playerShip.scale.setTo(0.4, 0.4); // set playerShip size
+//        game.physics.arcade.enable(this.playerShip); // enable playerShip properties like velocity etc.
+//        this.playerShip.body.collideWorldBounds = true; // enable that playerShip hit the game world bound;
+//};
+//function onCurrentPlayer(data) {
+//    var enm = new currentEnemy(data.id, data.x, data.y);
+//    enemies.push(enm);
+//}
 /***** functions end *****/
 
 /***** main object prototype start *****/
@@ -179,7 +205,7 @@ main.prototype = {
     },
 
     create: function () {
-        backgroundMap = game.add.tileSprite(0, 0, 800, 500, 'background');
+        backgroundMap = game.add.tileSprite(0, 0, 500, 500, 'background');
         game.physics.enable(backgroundMap, Phaser.Physics.ARCADE);
         // backgroundMap.body.collideWorldBounds = true;
         // backgroundMap.body.immovable = true;
@@ -194,6 +220,7 @@ main.prototype = {
         // socket.on listener
         onSocketConnected();
         socket.on('new-enemy-player', onNewPlayer);
+        //socket.on('current-enemy-player', onCurrentPlayer);
         socket.on('enemy-move', onEnemyMove);
         socket.on('player-hit', onPlayerHit);
         socket.on('player-bullets-update', onPlayerBulletUpdate);
@@ -252,10 +279,11 @@ main.prototype = {
                     if (j >= 20) j = 0;
                 }
             } else if (playerShip.alive == false) {
-                if (respawn.isDown) {
+                if (respawn.justUp) {
                     playerShip.reset(game.world.centerX, game.world.centerY);
                     playerShip.revive();
-                    socket.emit('new-player', {
+                    //socket.emit('new-player', {
+                    socket.emit('revive', {
                         x: playerShip.x,
                         y: playerShip.y
                     });
