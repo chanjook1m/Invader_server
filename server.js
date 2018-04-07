@@ -10,10 +10,10 @@ app.use(express.static(__dirname + '/js'));
 app.use('/assets', express.static(__dirname + '/assets'));
 
 // process.env -> 서버의 환경변수 이용
-server.listen(process.env.PORT || 3002);
+server.listen(process.env.PORT || 3000);
 console.log('Server started');
 
-var MAX_MONSTER = 1;
+var MAX_MONSTER = 2;
 var playerList = [];
 var playerBulletArr = [];
 var monsterList = [];
@@ -41,12 +41,17 @@ var Player = function (startX, startY) {
 io.on('connection', function (socket) {
     console.log('a new player connected ' + socket.id);
     socket.on('new-player', onNewPlayer);
+    socket.on('revive', onRevive);
     socket.on('move-player', onMovePlayer);
     socket.on('player-fire', onEnemyFire);
     socket.on('disconnect', onClientDisconnect);
+    socket.on('debug', onDebug);
     setInterval(serverGameLoop, 200);
 });
 
+function onDebug(data) {
+    console.log('debug' + data.data);
+}
 /***** functions start *****/
 function onNewPlayer(data) {
     var newPlayer = new Player(data.x, data.y);
@@ -59,19 +64,36 @@ function onNewPlayer(data) {
 
     for (var i = 0; i < playerList.length; i++) {
         var existingPlayer = playerList[i];
+        if (existingPlayer.id != newPlayer.id && existingPlayer != undefined) {
         var playerInfo = {
             id: existingPlayer.id,
             x: existingPlayer.x,
             y: existingPlayer.y
         };
-        this.emit('new-enemy-player', playerInfo);
+            this.emit('new-enemy-player', playerInfo);
+        }
     }
     this.broadcast.emit('new-enemy-player', currentInfo);
-    io.emit('new-monster', monsterList);
-    playerList.push(newPlayer);
+    //io.emit('new-monster', monsterList);
+    playerList.push(currentInfo);
+}
+function onRevive(data) {
+    var newPlayer = new Player(data.x, data.y);
+    newPlayer.id = this.id;
+    var currentInfo = {
+        id: newPlayer.id,
+        x: newPlayer.x,
+        y: newPlayer.y
+    };
+    this.broadcast.emit('new-enemy-player', currentInfo);
+    //io.emit('new-monster', monsterList);
+    playerList.push(currentInfo);
 }
 
+
 function onMovePlayer(data) {
+//    for (var i = 0; i < playerList.length; i++)
+//        console.log(playerList[i]);
     if (findPlayerId(this.id)) {
         var movePlayer = findPlayerId(this.id);
         movePlayer.x = data.x;
@@ -114,7 +136,7 @@ function onEnemyFire(datas) {
 }
 
 function onMonsterCreate() {
-    var newMonster = new MonsterShip(Math.floor(Math.random() * 700) + 1, Math.floor(Math.random() * 400) + 1);
+    var newMonster = new MonsterShip(Math.floor(Math.random() * 400) + 1, Math.floor(Math.random() * 400) + 1);
 
     monsterList.push(newMonster);
     io.emit('new-monster', monsterList);
@@ -175,7 +197,7 @@ function monsterBulletUpdate() {
         }
 
         // 몬스터 미사일이 화면 밖으로 나가면 삭제
-        if (mbullet.x < 0 || mbullet.x > 800 || mbullet.y < 0 || mbullet.y > 500) {
+        if (mbullet.x < 0 || mbullet.x > 500 || mbullet.y < 0 || mbullet.y > 500) {
             monsterBulletArr.splice(i, 1);
             i--;
         }
@@ -205,7 +227,7 @@ function playerBulletUpdate() {
             }
         }
         // 플레이어 미사일이 화면 밖으로 나가면 삭제
-        if (bullet.x < 0 || bullet.x > 800 || bullet.y < 0 || bullet.y > 500) {
+        if (bullet.x < 0 || bullet.x > 500 || bullet.y < 0 || bullet.y > 500) {
             playerBulletArr.splice(i, 1);
             i--;
         }
@@ -216,7 +238,7 @@ function serverGameLoop() {
     
 
     // 1/100 확률로 MAX_MONSTER 개의 몬스터 생성
-    if ((Math.floor(Math.random() * 100) + 1) == 1 && monsterNum < MAX_MONSTER) {
+    if ((Math.floor(Math.random() * 300) + 1) == 1 && monsterNum < MAX_MONSTER) {
         onMonsterCreate();
         monsterNum++;
     }
